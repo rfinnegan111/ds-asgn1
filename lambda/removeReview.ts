@@ -1,27 +1,17 @@
 import { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
-
-import {
-  QueryCommand,
-  QueryCommandInput,
-} from "@aws-sdk/lib-dynamodb";
-
-import Ajv from "ajv";
-import schema from "../shared/types.schema.json";
-
-const ajv = new Ajv();
-const isValidQueryParams = ajv.compile(
-  schema.definitions["MovieAndReviewQueryParams"] || {}
-);
+import { DeleteCommand, DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { parse } from "querystring";
 
 const ddbDocClient = createDDbDocClient();
 
 export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
+
   try {
     console.log("Event: ", event);
     const parameters  = event?.pathParameters;
     const movieId = parameters?.movieId ? parseInt(parameters.movieId) : undefined;
+    const reviewerName = parameters?.revewerName ? parse(parameters.revewerName) : undefined;
 
     if (!movieId) {
       return {
@@ -33,55 +23,34 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
       };
     }
 
-
-    const queryParams = event.queryStringParameters;
-    if (!queryParams) {
-      return {
-        
-      };
-    }
-    if (!isValidQueryParams(queryParams)) {
-      return {
-      } 
-    }
-
-    const cast = queryParams;
-    let commandInput: QueryCommandInput = {
-      TableName: process.env.REVIEW_TABLE_NAME,
-    };
-    if ("reviews" in queryParams) {
-      commandInput = {
-        ...commandInput,
-        // IndexName: "roleIx",
-        KeyConditionExpression: " movieId = :m ",
-        ExpressionAttributeValues: {
-          ":m": movieId,
-          cast: new QueryCommand(commandInput)
-        },
-      };
-    }
-
-
+    if (!reviewerName) {
+        return {
+          statusCode: 404,
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ Message: "Missing Reviewer" }),
+        };
+      }
 
     const commandOutput = await ddbDocClient.send(
-      new GetCommand({
-        TableName: process.env.TABLE_NAME,
-        Key: { movieId: movieId },
-      }),
+      new DeleteCommand({
+        TableName: process.env.REVIEW_TABLE_NAME,
+        Key: { movieId: movieId, reviewerName: reviewerName },
+      })
     );
-    
-    console.log("GetCommand response: ", commandOutput);
-    if (!commandOutput.Item) {
+    console.log("DeleteCommand response: ", commandOutput);
+    if (!commandOutput) {
       return {
         statusCode: 404,
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ Message: "Invalid Movie Item" }),
+        body: JSON.stringify({ Message: "Invalid Movie Item / Reviewer" }),
       };
     }
     const body = {
-      movie: commandOutput.Item,
+      data: commandOutput,
     };
 
     // Return Response
@@ -90,7 +59,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
       headers: {
         "content-type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify("Successful Removal" ),
     };
   } catch (error: any) {
     console.log(JSON.stringify(error));
@@ -99,7 +68,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
       headers: {
         "content-type": "application/json",
       },
-      body: JSON.stringify({ error }),
+      body: JSON.stringify("Failed Removal: \n" + { error }),
     };
   }
 };

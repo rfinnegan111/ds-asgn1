@@ -1,15 +1,12 @@
-import { Handler } from "aws-lambda";
-import { APIGatewayProxyHandlerV2 } from "aws-lambda"; 
-
+import { APIGatewayProxyHandlerV2 } from "aws-lambda";  
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
 const ddbDocClient = createDDbDocClient();
 
-export const handler: Handler = async (event, context) => {
+export const handler: APIGatewayProxyHandlerV2 = async (event, context) => { 
   try {
     console.log("Event: ", event);
-    const parameters = event?.queryStringParameters;
     
     const commandOutput = await ddbDocClient.send(
 
@@ -17,17 +14,17 @@ export const handler: Handler = async (event, context) => {
             TableName: process.env.TABLE_NAME,
           })
     );
-    if (!commandOutput) {
+    if (!commandOutput.Items) {
       return {
         statusCode: 404,
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ Message: "Invalid input" }),
+        body: JSON.stringify({ Message: "Invalid Movie Item" }),
       };
     }
     const body = {
-      data: commandOutput,
+      data: commandOutput.Items,
     };
 
     // Return Response
