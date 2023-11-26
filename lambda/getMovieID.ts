@@ -9,7 +9,6 @@ import {
   QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 
-
 const ajv = new Ajv();
 const isValidQueryParams = ajv.compile(
   schema.definitions["MovieAndReviewQueryParams"] || {}

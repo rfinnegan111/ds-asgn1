@@ -6,7 +6,7 @@ import schema from "../shared/types.schema.json";
 import { parse } from "querystring";
 
 const ajv = new Ajv();
-const isValidBodyParams = ajv.compile(schema.definitions["MovieReview"] || {});
+const isValidBodyParams = ajv.compile(schema.definitions["Review"] || {});
 
 const ddbDocClient = createDDbDocClient();
 
@@ -15,7 +15,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
     console.log("Event: ", event);
     const body = event.body ? JSON.parse(event.body) : undefined;
     const parameters  = event?.pathParameters;
-    const movieId = parameters?.movieId ? parseInt(parameters.movieId) : undefined;
+    const movieID = parameters?.movieID ? parseInt(parameters.movieID) : undefined;
     const reviewerName = parameters?.revewerName ? parse(parameters.revewerName) : undefined;
   
     if (!body) {
@@ -36,12 +36,12 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
           },
           body: JSON.stringify({
             message: `Incorrect must match movie schema`,
-            schema: schema.definitions["MovieReview"],
+            schema: schema.definitions["Review"],
           }),
         };
       }
 
-      if (!movieId) {
+      if (!movieID) {
         return {
           statusCode: 404,
           headers: {

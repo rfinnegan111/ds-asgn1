@@ -8,7 +8,7 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as lambdanode from "aws-cdk-lib/aws-lambda-nodejs";
 import * as custom from "aws-cdk-lib/custom-resources";
 import { generateBatch } from "../shared/util";
-import { movies, movieReviews } from "../seed/movies";
+import { movies, reviews } from "../seed/movies";
 
 type MovieAppApiProps = {
   userPoolId: string;
@@ -67,7 +67,7 @@ export class MovieAppApi extends Construct {
         parameters: {
           RequestItems: {
             [moviesTable.tableName]: generateBatch(movies),
-            [movieReviewsTable.tableName]: generateBatch(movieReviews), 
+            [movieReviewsTable.tableName]: generateBatch(reviews), 
           },
         },
         physicalResourceId: custom.PhysicalResourceId.of("moviesddbInitData"), 
