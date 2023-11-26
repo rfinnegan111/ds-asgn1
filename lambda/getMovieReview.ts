@@ -25,10 +25,14 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
     console.log("Event: ", event);
     const parameters  = event?.pathParameters;
     const queryParams = event.queryStringParameters;
-    const movieID = parameters?.movieId ? parseInt(parameters.movieId) : undefined;
-    const reviewerName = parameters?.reviewerName ? parameters.reviewerName : undefined;
-    
+    const movieID = parameters?.movieID ? parseInt(parameters.movieID) : undefined;
+    let reviewerName = parameters?.reviewerName ? parameters.reviewerName : undefined;
+    let reviewDate
 
+    if (!reviewerName) {
+      reviewDate = parameters;
+    } 
+    
     if (!movieID) {
       return {
         statusCode: 404,
@@ -40,34 +44,52 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
     }
 
     if (!reviewerName) {
-      return {
+      if (!reviewDate)
+      {return {
         statusCode: 404,
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ Message: "Missing Reviewer" }),
-      };
+        body: JSON.stringify({ Message: "Missing Reviewer / Year" }),
+      };}
     }
-    
+
     const ddbDocClient = createDocumentClient();
-    const commandOutput = await ddbClient.send(
-      new ScanCommand({
-        TableName: process.env.REVIEW_TABLE_NAME,
-        FilterExpression: "movieID = :m and begins_with(reviewerName, :a) ",
+;
+    let commandInput: QueryCommandInput = {
+      TableName: process.env.REVIEW_TABLE_NAME,
+    };
+    if (reviewDate) {
+      commandInput = {
+        ...commandInput,
+        KeyConditionExpression:"movieID = :m and begins_with(reviewDate, :a)",
+        ExpressionAttributeValues: {
+          ":m": movieID,
+          ":a": reviewDate,
+        },
+      };
+    } else {
+      commandInput = {
+        ...commandInput,
+        KeyConditionExpression:"movieID = :m and begins_with(reviewerName, :a) ",
         ExpressionAttributeValues: {
           ":m": movieID,
           ":a": reviewerName,
         },
-      })
-    );
-   
+      };
+    }
+
+    const commandOutput = await ddbDocClient.send(
+      new QueryCommand(commandInput)
+      );
+    
     if (!commandOutput.Items) {
       return {
         statusCode: 404,
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ Message: "Invalid Movie Item / Reviewer" }),
+        body: JSON.stringify({ Message: "Incorrect Movie Item / Reviewer" }),
       };
     }
     const body = {
@@ -106,7 +128,6 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
   const translateConfig = { marshallOptions, unmarshallOptions };
   return DynamoDBDocumentClient.from(ddbClient, translateConfig);
 }
-
 
 function createDDbDocClient() {
   const ddbClient = new DynamoDBClient({ region: process.env.REGION });

@@ -56,8 +56,13 @@ export class MovieAppApi extends Construct {
     });
 
     movieReviewsTable.addLocalSecondaryIndex({
-      indexName: "ratingIx",
+      indexName: "minRating",
       sortKey: { name: "content", type: dynamodb.AttributeType.STRING },
+    });
+    
+    movieReviewsTable.addLocalSecondaryIndex({
+      indexName: "reviewDate",
+      sortKey: { name: "reviewDate", type: dynamodb.AttributeType.STRING },
     });
 
     new custom.AwsCustomResource(this, "moviesddbInitData", {

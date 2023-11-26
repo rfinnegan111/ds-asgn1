@@ -1,26 +1,58 @@
 import { APIGatewayProxyHandlerV2 } from "aws-lambda";  
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { 
+  DynamoDBDocumentClient, 
+  ScanCommand,
+  GetCommand,
+  QueryCommand,
+  QueryCommandInput,
+} from "@aws-sdk/lib-dynamodb";
 
+const ddbClient = new DynamoDBClient({ region: process.env.REGION });
 const ddbDocClient = createDDbDocClient();
 
 export const handler: APIGatewayProxyHandlerV2 = async (event, context) => { 
   try {
     console.log("Event: ", event);
-    
-    const commandOutput = await ddbDocClient.send(
+    const queryParams = event.queryStringParameters;
 
-        new ScanCommand({
-            TableName: process.env.TABLE_NAME,
-          })
+    if (!queryParams) {
+      return {
+        statusCode: 500,
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ message: "Missing Query" }),
+      };
+    }
+
+    let commandInput;
+    let commandOutput;
+    if (queryParams.minRating) {
+      commandInput = {
+        TableName: process.env.REVIEW_TABLE_NAME,
+        IndexName: "minRating",
+        FilterExpression: "begins_with(content, :r) ",
+        ExpressionAttributeValues: {
+          ":r": queryParams.minRating?.toString(),
+        },
+      };
+    } else {
+        commandInput = {
+          TableName: process.env.TABLE_NAME,
+        }
+    }
+    commandOutput = await ddbClient.send(
+      new ScanCommand( commandInput )
     );
+
     if (!commandOutput.Items) {
       return {
         statusCode: 404,
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ Message: "Invalid Movie Item" }),
+        body: JSON.stringify({ Message: "Incorrect Movie Item" }),
       };
     }
     const body = {
