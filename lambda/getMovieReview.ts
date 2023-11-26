@@ -16,7 +16,7 @@ const ajv = new Ajv();
 const isValidQueryParams = ajv.compile(
   schema.definitions["MovieAndReviewQueryParams"] || {}
 );
- 
+
 const ddbClient = new DynamoDBClient({ region: process.env.REGION });
 const ddbDocClient = createDDbDocClient();
 
@@ -27,11 +27,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
     const queryParams = event.queryStringParameters;
     const movieID = parameters?.movieID ? parseInt(parameters.movieID) : undefined;
     let reviewerName = parameters?.reviewerName ? parameters.reviewerName : undefined;
-    let reviewDate
-
-    if (!reviewerName) {
-      reviewDate = parameters;
-    } 
+    let reviewDate = Number(parameters?.reviewerName) ? Number(parameters?.reviewerName) : undefined;
     
     if (!movieID) {
       return {
@@ -56,31 +52,29 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
 
     const ddbDocClient = createDocumentClient();
 ;
-    let commandInput: QueryCommandInput = {
+let commandInput;
+  if (reviewDate) {
+    commandInput = {
       TableName: process.env.REVIEW_TABLE_NAME,
+      FilterExpression:"movieID = :m and begins_with(reviewDate, :a)",
+      ExpressionAttributeValues: {
+        ":m": movieID,
+        ":a": reviewDate.toString(),
+      },
     };
-    if (reviewDate) {
-      commandInput = {
-        ...commandInput,
-        KeyConditionExpression:"movieID = :m and begins_with(reviewDate, :a)",
-        ExpressionAttributeValues: {
-          ":m": movieID,
-          ":a": reviewDate,
-        },
-      };
-    } else {
-      commandInput = {
-        ...commandInput,
-        KeyConditionExpression:"movieID = :m and begins_with(reviewerName, :a) ",
-        ExpressionAttributeValues: {
-          ":m": movieID,
-          ":a": reviewerName,
-        },
-      };
-    }
+  } else {
+    commandInput = {
+      TableName: process.env.REVIEW_TABLE_NAME,
+      FilterExpression:"movieID = :m and begins_with(reviewerName, :a) ",
+      ExpressionAttributeValues: {
+        ":m": movieID,
+        ":a": reviewerName,
+      },
+    };
+  }
 
     const commandOutput = await ddbDocClient.send(
-      new QueryCommand(commandInput)
+      new ScanCommand(commandInput)
       );
     
     if (!commandOutput.Items) {
