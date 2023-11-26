@@ -10,6 +10,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
     console.log("Event: ", event);
     const parameters  = event?.pathParameters;
     const movieID = parameters?.movieID ? parseInt(parameters.movieID) : undefined;
+    const queryParams = event.queryStringParameters;
 
     if (!movieID) {
         return {
@@ -21,15 +22,28 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
         };
       }
 
-      const commandOutput = await ddbClient.send(
-        new ScanCommand({
+      let commandInput;
+      let commandOutput;
+  
+      if (queryParams?.minRating) {
+        commandInput = {
           TableName: process.env.REVIEW_TABLE_NAME,
-          FilterExpression: "movieID = :m",
+          IndexName: "minRating",
+          FilterExpression: "movieID = :m and begins_with(content, :r) ",
           ExpressionAttributeValues: {
             ":m": movieID,
+            ":r": queryParams.minRating?.toString(),
           },
-        })
-      );
+        };
+      }  else {
+        commandInput = {
+          TableName: process.env.REVIEW_TABLE_NAME,
+            FilterExpression: "movieID = :m",
+            ExpressionAttributeValues: {
+              ":m": movieID,
+            },
+        };
+      } 
 
       if (!commandOutput.Items) {
         return {
@@ -37,7 +51,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
           headers: {
             "content-type": "application/json",
           },
-          body: JSON.stringify({ Message: "Invalid Movie Item" }),
+          body: JSON.stringify({ Message: "Incorrect Movie Item" }),
         };
       }
       const body = {

@@ -59,7 +59,7 @@ export class MovieAppApi extends Construct {
       indexName: "minRating",
       sortKey: { name: "content", type: dynamodb.AttributeType.STRING },
     });
-    
+
     movieReviewsTable.addLocalSecondaryIndex({
       indexName: "reviewDate",
       sortKey: { name: "reviewDate", type: dynamodb.AttributeType.STRING },
@@ -87,6 +87,7 @@ export class MovieAppApi extends Construct {
     const addReviewRes = getAllMoviesRes.addResource("reviews");
     const getAllReviewsRes = getMovieRes.addResource("reviews");
     const getReviewRes = getAllReviewsRes.addResource("{reviewerName}");
+    const getReviewsByReviewerRes = addReviewRes.addResource("{reviewerName}")
 
 
     const authorizerFn = new node.NodejsFunction(this, "AuthorizerFn", {
@@ -106,6 +107,7 @@ export class MovieAppApi extends Construct {
           REGION: 'eu-west-1',
       },
     });
+
     const movieIDFn = new node.NodejsFunction(this, "GetMovieIDFn", {
       ...appCommonFnProps,
       entry: "./lambda/getMovieID.ts",
@@ -185,6 +187,19 @@ export class MovieAppApi extends Construct {
       },
     });
     
+    const getReviewsByReviewerFn = new node.NodejsFunction(this, "GetReviewsByReviewerFn", {
+      ...appCommonFnProps,
+      entry: "./lambda/getReviewsByReviewer.ts",
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_16_X,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        REVIEW_TABLE_NAME: movieReviewsTable.tableName,
+        REGION: "eu-west-1",
+      },
+    });
+
     moviesTable.grantReadData(movieIDFn)
     moviesTable.grantReadData(allMoviesFn)
     movieReviewsTable.grantReadData(allMovieReviewsFn);
@@ -192,6 +207,7 @@ export class MovieAppApi extends Construct {
     movieReviewsTable.grantReadWriteData(addReviewFn)
     movieReviewsTable.grantReadWriteData(removeReviewFn)
     movieReviewsTable.grantReadWriteData(updateReviewFn)
+    movieReviewsTable.grantReadData(getReviewsByReviewerFn);
 
     const requestAuthorizer = new apig.RequestAuthorizer(
       this,
@@ -207,6 +223,7 @@ export class MovieAppApi extends Construct {
     getMovieRes.addMethod("GET", new apig.LambdaIntegration(movieIDFn));
     getAllReviewsRes.addMethod("GET", new apig.LambdaIntegration(allMovieReviewsFn));
     getReviewRes.addMethod("GET", new apig.LambdaIntegration(movieReviewFn));
+    getReviewsByReviewerRes.addMethod("GET", new apig.LambdaIntegration(getReviewsByReviewerFn));
 
     addReviewRes.addMethod("POST", new apig.LambdaIntegration(addReviewFn), {
       authorizer: requestAuthorizer,

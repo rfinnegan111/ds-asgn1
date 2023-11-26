@@ -16,19 +16,9 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
     console.log("Event: ", event);
     const queryParams = event.queryStringParameters;
 
-    if (!queryParams) {
-      return {
-        statusCode: 500,
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ message: "Missing Query" }),
-      };
-    }
-
     let commandInput;
     let commandOutput;
-    if (queryParams.minRating) {
+    if (queryParams?.minRating) {
       commandInput = {
         TableName: process.env.REVIEW_TABLE_NAME,
         IndexName: "minRating",
