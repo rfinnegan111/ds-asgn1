@@ -2,7 +2,8 @@ import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { UserPool } from "aws-cdk-lib/aws-cognito";
 import { AuthApi } from './auth-api'
-import {MovieAppApi } from './movieapp-api'
+import { MovieAppApi } from './movieapp-api'
+
 
 export class DsAsgn1MainStack extends cdk.Stack {
 
@@ -23,12 +24,12 @@ export class DsAsgn1MainStack extends cdk.Stack {
 
     const userPoolClientId = appClient.userPoolClientId;
 
-    new AuthApi(this, 'AuthServiceApi', {
+    new AuthApi(this, 'AuthApi', {
 			userPoolId: userPoolId,
 			userPoolClientId: userPoolClientId,
 		});
 
-    new MovieAppApi(this, 'AppApi', {
+    new MovieAppApi(this, 'MovieAppApi', {
 			userPoolId: userPoolId,
 			userPoolClientId: userPoolClientId,
 		} );

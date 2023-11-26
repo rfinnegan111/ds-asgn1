@@ -1,14 +1,14 @@
 import { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
+import Ajv from "ajv";
+import schema from "../shared/types.schema.json";
 
 import {
   QueryCommand,
   QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 
-import Ajv from "ajv";
-import schema from "../shared/types.schema.json";
 
 const ajv = new Ajv();
 const isValidQueryParams = ajv.compile(
@@ -17,13 +17,13 @@ const isValidQueryParams = ajv.compile(
 
 const ddbDocClient = createDDbDocClient();
 
-export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
+export const handler: APIGatewayProxyHandlerV2 = async (event, context) => { 
   try {
     console.log("Event: ", event);
     const parameters  = event?.pathParameters;
-    const movieId = parameters?.movieId ? parseInt(parameters.movieId) : undefined;
+    const movieID = parameters?.movieID ? parseInt(parameters.movieID) : undefined;
 
-    if (!movieId) {
+    if (!movieID) {
       return {
         statusCode: 404,
         headers: {
@@ -33,43 +33,13 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
       };
     }
 
-
-    const queryParams = event.queryStringParameters;
-    if (!queryParams) {
-      return {
-        
-      };
-    }
-    if (!isValidQueryParams(queryParams)) {
-      return {
-      } 
-    }
-
-    const cast = queryParams;
-    let commandInput: QueryCommandInput = {
-      TableName: process.env.REVIEW_TABLE_NAME,
-    };
-    if ("reviews" in queryParams) {
-      commandInput = {
-        ...commandInput,
-        // IndexName: "roleIx",
-        KeyConditionExpression: " movieId = :m ",
-        ExpressionAttributeValues: {
-          ":m": movieId,
-          cast: new QueryCommand(commandInput)
-        },
-      };
-    }
-
-
-
     const commandOutput = await ddbDocClient.send(
       new GetCommand({
         TableName: process.env.TABLE_NAME,
-        Key: { movieId: movieId },
-      }),
+        Key: { movieID: movieID },
+      })
     );
-    
+ 
     console.log("GetCommand response: ", commandOutput);
     if (!commandOutput.Item) {
       return {
@@ -81,9 +51,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
       };
     }
     const body = {
-      movie: commandOutput.Item,
+      data: commandOutput.Item,
     };
-
     // Return Response
     return {
       statusCode: 200,

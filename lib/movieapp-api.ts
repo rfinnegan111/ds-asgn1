@@ -1,9 +1,11 @@
+import { Aws } from "aws-cdk-lib";
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as apig from "aws-cdk-lib/aws-apigateway";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as node from "aws-cdk-lib/aws-lambda-nodejs";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as lambdanode from "aws-cdk-lib/aws-lambda-nodejs";
 import * as custom from "aws-cdk-lib/custom-resources";
 import { generateBatch } from "../shared/util";
 import { movies, movieReviews } from "../seed/movies";
@@ -40,14 +42,14 @@ export class MovieAppApi extends Construct {
 
     const moviesTable = new dynamodb.Table(this, "MoviesTable", {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      partitionKey: { name: "movieId", type: dynamodb.AttributeType.NUMBER },
+      partitionKey: { name: "movieID", type: dynamodb.AttributeType.NUMBER },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       tableName: "Movies",
     });
 
     const movieReviewsTable = new dynamodb.Table(this, "MovieReviewTable", {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      partitionKey: { name: "movieId", type: dynamodb.AttributeType.NUMBER },
+      partitionKey: { name: "movieID", type: dynamodb.AttributeType.NUMBER },
       sortKey: { name: "reviewerName", type: dynamodb.AttributeType.STRING },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       tableName: "MovieReview",
@@ -65,7 +67,7 @@ export class MovieAppApi extends Construct {
         parameters: {
           RequestItems: {
             [moviesTable.tableName]: generateBatch(movies),
-            [movieReviewsTable.tableName]: generateBatch(movieReviews),  
+            [movieReviewsTable.tableName]: generateBatch(movieReviews), 
           },
         },
         physicalResourceId: custom.PhysicalResourceId.of("moviesddbInitData"), 
@@ -76,25 +78,18 @@ export class MovieAppApi extends Construct {
     });
 
     const getAllMoviesRes = movieAppApi.root.addResource("movies");
-    const getMovieRes = getAllMoviesRes.addResource("{movieId}");
-    const addReviewRes = getMovieRes.addResource("reviews");
-    const getReviewRes = addReviewRes.addResource("{reviewerName}");
+    const getMovieRes = getAllMoviesRes.addResource("{movieID}");
+    const addReviewRes = getAllMoviesRes.addResource("reviews");
+    const getAllReviewsRes = getMovieRes.addResource("reviews");
+    const getReviewRes = getAllReviewsRes.addResource("{reviewerName}");
 
 
-    const addReviewFn = new node.NodejsFunction(this, "AddReviewFn", {
+    const authorizerFn = new node.NodejsFunction(this, "AuthorizerFn", {
       ...appCommonFnProps,
-      entry: "./lambda/addReview.ts",
-    });
-    const removeReviewFn = new node.NodejsFunction(this, "RemoveReviewFn", {
-      ...appCommonFnProps,
-      entry: "./lambda/removeReview.ts",
-    });
-    const updateReviewFn = new node.NodejsFunction(this, "UpdateReviewFn", {
-      ...appCommonFnProps,
-      entry: "./lambda/updateReview.ts",
+      entry: "./lambda/auth/authorizer.ts",
     });
 
-    const getAllMoviesFn = new node.NodejsFunction(this, "GetAllMoviesFn", {
+    const allMoviesFn = new node.NodejsFunction(this, "GetAllMoviesFn", {
       ...appCommonFnProps,
       entry: "./lambda/getAllMovies.ts",
       architecture: lambda.Architecture.ARM_64,
@@ -106,22 +101,92 @@ export class MovieAppApi extends Construct {
           REGION: 'eu-west-1',
       },
     });
-    const getMovieByIdFn = new node.NodejsFunction(this, "GetMovieByIdFn", {
+    const movieIDFn = new node.NodejsFunction(this, "GetMovieIDFn", {
       ...appCommonFnProps,
-      entry: "./lambda/public.ts",
+      entry: "./lambda/getMovieID.ts",
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_16_X,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        TABLE_NAME: moviesTable.tableName,
+        REGION: 'eu-west-1',
+      },
     });
-    const getMovieReviewsFn = new node.NodejsFunction(this, "GetMovieReviewsFn", {
+
+    const addReviewFn = new node.NodejsFunction(this, "AddReviewFn", {
+      ...appCommonFnProps,
+      entry: "./lambda/addReview.ts",
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_16_X,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        TABLE_NAME: movieReviewsTable.tableName,
+        REGION: "eu-west-1",
+      },
+    });
+
+    
+    const allMovieReviewsFn = new node.NodejsFunction(this, "GetAllMovieReviewsFn", {
+      ...appCommonFnProps,
+      entry: "./lambda/getAllMovieReviews.ts",
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_16_X,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        REVIEW_TABLE_NAME: movieReviewsTable.tableName,
+        REGION: "eu-west-1",
+      },
+    });
+
+    const movieReviewFn = new node.NodejsFunction(this, "GetMovieReviewFn", {
       ...appCommonFnProps,
       entry: "./lambda/getMovieReview.ts",
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_16_X,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        REVIEW_TABLE_NAME: movieReviewsTable.tableName,
+        REGION: "eu-west-1",
+      },
     });
-    
 
-    const authorizerFn = new node.NodejsFunction(this, "AuthorizerFn", {
+    const removeReviewFn = new node.NodejsFunction(this, "RemoveReviewFn", {
       ...appCommonFnProps,
-      entry: "./lambda/auth/authorizer.ts",
+      entry: "./lambda/removeReview.ts",
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_16_X,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        TABLE_NAME: movieReviewsTable.tableName,
+        REGION: 'eu-west-1',
+      },
     });
 
-    moviesTable.grantReadData(getAllMoviesFn)
+    const updateReviewFn = new node.NodejsFunction(this, "UpdateReviewFn", {
+      ...appCommonFnProps,
+      entry: "./lambda/updateReview.ts",
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_16_X,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        TABLE_NAME: movieReviewsTable.tableName,
+        REGION: "eu-west-1",
+      },
+    });
+     
+    moviesTable.grantReadData(movieIDFn)
+    moviesTable.grantReadData(allMoviesFn)
+    movieReviewsTable.grantReadData(allMovieReviewsFn);
+    movieReviewsTable.grantReadData(movieReviewFn);
+    movieReviewsTable.grantReadWriteData(addReviewFn)
+    movieReviewsTable.grantReadWriteData(removeReviewFn)
+    movieReviewsTable.grantReadWriteData(updateReviewFn)
 
     const requestAuthorizer = new apig.RequestAuthorizer(
       this,
@@ -133,9 +198,10 @@ export class MovieAppApi extends Construct {
       }
     );
 
-    getAllMoviesRes.addMethod("GET", new apig.LambdaIntegration(getAllMoviesFn));
-    getMovieRes.addMethod("GET", new apig.LambdaIntegration(getMovieByIdFn));
-    getReviewRes.addMethod("GET", new apig.LambdaIntegration(getMovieReviewsFn));
+    getAllMoviesRes.addMethod("GET", new apig.LambdaIntegration(allMoviesFn));
+    getMovieRes.addMethod("GET", new apig.LambdaIntegration(movieIDFn));
+    getAllReviewsRes.addMethod("GET", new apig.LambdaIntegration(allMovieReviewsFn));
+    getReviewRes.addMethod("GET", new apig.LambdaIntegration(movieReviewFn));
 
     addReviewRes.addMethod("POST", new apig.LambdaIntegration(addReviewFn), {
       authorizer: requestAuthorizer,
@@ -149,6 +215,7 @@ export class MovieAppApi extends Construct {
       authorizer: requestAuthorizer,
       authorizationType: apig.AuthorizationType.CUSTOM,
     });
+
 
   }
 }
