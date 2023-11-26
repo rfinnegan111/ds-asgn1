@@ -179,7 +179,7 @@ export class MovieAppApi extends Construct {
         REGION: "eu-west-1",
       },
     });
-     
+    
     moviesTable.grantReadData(movieIDFn)
     moviesTable.grantReadData(allMoviesFn)
     movieReviewsTable.grantReadData(allMovieReviewsFn);

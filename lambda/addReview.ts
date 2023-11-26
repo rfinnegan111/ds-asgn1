@@ -12,7 +12,6 @@ const ddbDocClient = createDDbDocClient();
 export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
   try {
     console.log("Event: ", event);
-
     const body = event.body ? JSON.parse(event.body) : undefined;
     if (!body) {
       return {
@@ -31,7 +30,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
             "content-type": "application/json",
           },
           body: JSON.stringify({
-            message: `Incorrect must match Review Schema`,
+            message: `Incorrect must match review schema`,
             schema: schema.definitions["MovieReview"],
           }),
         };
@@ -40,7 +39,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
     const commandOutput = await ddbDocClient.send(
       new PutCommand({
         TableName: process.env.REVIEW_TABLE_NAME,
-        Item: {body},
+        Item:  body ,
       })
     );
     return {
